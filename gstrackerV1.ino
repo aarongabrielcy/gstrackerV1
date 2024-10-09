@@ -114,7 +114,7 @@ char last_valid_lat2[10], last_valid_lon2[10];
 //const int GPO1  = 1; //back up
 const int GPO8  = 8; //Power in (sheld 1.1)
 const int GPO9  = 9; //power in (back up sheld 1.1)
-const int GPO10 = 10; // ign;rojo
+const int GPO10 = 46; // ign;rojo
 const int GPO11 = 11;// in1;azul
 const int GPO12 = 12; //in2
 const int GPO13 = 13; //out1;amarillo
@@ -186,7 +186,15 @@ void loop() {
     gps.f_get_position(&flat, &flon, &age);
       // Almacena las coordenadas con 5 decimales
     lat2 = (float)flat;
-    lon2 = (float)flon;      
+    lon2 = (float)flon;
+
+    // Consult data GPS module
+    /*print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
+    print_int(gps.hdop(), TinyGPS::GPS_INVALID_HDOP, 5);
+    print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
+    print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);*/
+    //print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
+
     lat2 = get_float_value(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
     lon2 = get_float_value(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
     fix = get_int_value(age, TinyGPS::GPS_INVALID_AGE, 5);
@@ -211,13 +219,6 @@ void loop() {
   /*if(gprs_state){
     dataModem();
   }*/
-
-  // Consult data GPS module
-  /*print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
-  print_int(gps.hdop(), TinyGPS::GPS_INVALID_HDOP, 5);
-  print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
-  print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
-  print_int(age, TinyGPS::GPS_INVALID_AGE, 5);*/
 
   //Format data GNSS
   if(speed2 == -1.00 || speed2 == 0){
@@ -252,10 +253,10 @@ void loop() {
     previousMillis = currentMillis;
     Serial.print("DATA => ");
     if(gnss_valid){
-        //Serial.println("Posición válida!");
-        data = String(headers[0])+";"+overwritten_imei+";3FFFFF;95;1.0.21;1;"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";04BB4A02;334;20;3C1F;18;+"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+vsat2+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+mode+";1;0929;"+backup_batt+";"+power_in;
+        Serial.println("Posición válida!");
+        data = String(headers[0])+";"+overwritten_imei+";3FFFFF;95;1.0.21;1;"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";04BB4A02;334;20;3C1F;18;+"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+3+";"+1+";00000"+in2+in1+ign+";000000"+out2+out1+";"+mode+";1;0929;"+backup_batt+";"+power_in;
     }else{
-      //Serial.println("SIN Posición válida!");
+      Serial.println("SIN Posición válida!");
       getModemDateTime();
       data = String(headers[0])+";"+overwritten_imei+";3FFFFF;95;1.0.21;1;"+datetimeModem+";04BB4A02;334;20;3C1F;18;+"+lat2+"0000;-"+lon2+"0000;"+String(speed2)+";81.36;"+vsat2+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+mode+";1;0929;"+backup_batt+";"+power_in;
       //data  = "STT;6047417071;3FFFFF;95;1.0.21;1;20240923;08:39:16;04BB4A02;334;20;3C1F;18;+21.020603;-89.585097;0.19;81.36;17;1;00000001;00000000;1;1;0929;4.1;14.19";
@@ -411,7 +412,11 @@ void sendDATA(String data){
 bool output_active(String input){
   TinyGsmClient client(modem, 0);
   String response = String(headers[2])+";"+overwritten_imei+";"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";000039C5;"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+vsat2+";"+fix+";2958851;"+power_in+";00000"+in2+in1+ign+";000000"+out2+out1+";0;0";
-  if(input == String(headers[3])+String(overwritten_imei)+"04;01"){
+  String seco_on = String(headers[3])+";"+overwritten_imei+";"+"04;01";
+  String seco_off = String(headers[3])+";"+overwritten_imei+";"+"04;02";
+  Serial.print("SECO =: ");
+  Serial.println(seco_on);
+  if(input == seco_on){
   
     PMU.setChargingLedMode(XPOWERS_CHG_LED_ON);
     digitalWrite(GPO13, HIGH);
@@ -419,7 +424,7 @@ bool output_active(String input){
     client.print(response);
     Serial.println("Activar salida ===========>");
     return true;
-  }else if(input == String(headers[3])+String(overwritten_imei)+"04;02"){
+  }else if(input == seco_off){
     PMU.setChargingLedMode(XPOWERS_CHG_LED_OFF);
     digitalWrite(GPO13, LOW);
     out1 = 0;
@@ -674,7 +679,7 @@ int event_generated(int event){
   
   Serial.print("EVENT => ");
   if(gnss_valid){
-    data_event = String(headers[1])+";"+overwritten_imei+";3FFFFF;52;1.0.45;0;"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";0000B0E2;334;20;1223;11;+"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+vsat2+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+event+";;";
+    data_event = String(headers[1])+";"+overwritten_imei+";3FFFFF;52;1.0.45;0;"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";0000B0E2;334;20;1223;11;+"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+vsat2+";"+1+";00000"+in2+in1+ign+";000000"+out2+out1+";"+event+";;";
     }else{
     float speed_err = (speed2 == -1.00) ? 0.00 : speed2;
       getModemDateTime();
