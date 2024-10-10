@@ -166,7 +166,8 @@ void setup() {
   pinMode(GPO13, OUTPUT);
   pinMode(GPO10,INPUT_PULLUP);
   pinMode(GPO11,INPUT_PULLUP);
-  pinMode(GPO12,INPUT_PULLUP);
+  pinMode(GPO12,OUTPUT);
+  digitalWrite(GPO12,HIGH);
 
   Serial1.begin(115200, SERIAL_8N1, BOARD_MODEM_RXD_PIN, BOARD_MODEM_TXD_PIN);
   configModem();
