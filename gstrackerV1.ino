@@ -12,10 +12,10 @@ NOTA: Es necesario validar la posición(fix) todo el tiempo.
 #define XPOWERS_CHIP_AXP2101
 #include "XPowersLib.h"
 #include "utilities.h"
+#include <TinyGPS++.h>
 #include <SoftwareSerial.h>
-#include <TinyGPS.h>
 
-TinyGPS gps;
+TinyGPSPlus gps;
 SoftwareSerial serialgps(44,43);
 XPowersPMU  PMU;
 
@@ -99,7 +99,8 @@ const int port = 6100;*/
 const int port = 5208;*/
 
 const char* server = "34.196.135.179"; //V3 PROD
-const char* overwritten_imei = "6047417071";
+const char* overwritten_imei = "6047403956";
+
 const int port = 5200;
 const char *headers[] = {
     "STT",
@@ -111,6 +112,10 @@ String readcommand = "";
 
 bool last_valid_position;
 char last_valid_lat2[10], last_valid_lon2[10];
+double latitude = 0.0, longitude = 0.0, speed = 0.0, course = 0.0;
+unsigned int satellites = 0;
+
+String fechaHora;
 //const int GPO1  = 1; //back up
 const int GPO8  = 8; //Power in (sheld 1.1)
 const int GPO9  = 9; //power in (back up sheld 1.1)
@@ -132,13 +137,6 @@ bool LaststateInput1 = HIGH;
 
 unsigned long previousMillis = 0;   // Guarda el tiempo del último evento
 const long interval = 7000;        // Intervalo de tiempo en milisegundos (10 segundos)
-
-static void smartdelay(unsigned long ms);
-static void print_float(float val, float invalid, int len, int prec);
-static void print_int(unsigned long val, unsigned long invalid, int len);
-static void print_date(TinyGPS &gps);
-static float get_float_value(float val, float invalid, int len, int prec);
-static int get_int_value(unsigned long val, unsigned long invalid, int len);
 
 void setup() {
   Serial.begin(115200);
@@ -168,7 +166,7 @@ void setup() {
   pinMode(GPO11,INPUT_PULLUP);
   pinMode(GPO12,OUTPUT);
   digitalWrite(GPO12,HIGH);
-
+  
   Serial1.begin(115200, SERIAL_8N1, BOARD_MODEM_RXD_PIN, BOARD_MODEM_TXD_PIN);
   configModem();
 }
@@ -181,29 +179,29 @@ void loop() {
   }
   // get data GNSS
   //agregar la validacion otra vez del fix y position_valid
-    float flat, flon;
-    unsigned long age;
+    /*printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
+    printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+    printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
+    printDateTime(gps.date, gps.time);
+    printFloat(gps.course.deg(), gps.course.isValid(), 7, 2);
+    printFloat(gps.speed.kmph(), gps.speed.isValid(), 6, 2);*/
 
-    gps.f_get_position(&flat, &flon, &age);
-      // Almacena las coordenadas con 5 decimales
-    lat2 = (float)flat;
-    lon2 = (float)flon;
+    while (serialgps.available() > 0) {
+      gps.encode(serialgps.read());
+    }   
+    if (gps.location.isUpdated()) {
+      gnss_valid = true;
+      Serial.println("ACTUALIZA COORDENADAS!!!!!!!!!!!!!!!!!!! ");
+      latitude = gps.location.lat();
+      longitude = gps.location.lng();
+      speed = gps.speed.kmph();
+      course = gps.course.deg();
+      satellites = gps.satellites.value();
+      fix = gps.location.isValid() ? 1 : 0;
 
-    // Consult data GPS module
-    /*print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
-    print_int(gps.hdop(), TinyGPS::GPS_INVALID_HDOP, 5);
-    print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
-    print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);*/
-    //print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
-
-    lat2 = get_float_value(flat, TinyGPS::GPS_INVALID_F_ANGLE, 10, 6);
-    lon2 = get_float_value(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
-    fix = get_int_value(age, TinyGPS::GPS_INVALID_AGE, 5);
-    vsat2 = get_int_value(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
-    //speed2 = get_float_value(flon, TinyGPS::GPS_INVALID_F_ANGLE, 11, 6);
-    speed2 = gps.f_speed_kmph();
-    print_date(gps);    
-  
+      // Obtener la fecha y la hora en el formato deseado
+      fechaHora = getDateTimeGPS(gps.date, gps.time);
+    }
   // Inputs/Outputs state
 
   // Calculate data
@@ -255,11 +253,11 @@ void loop() {
     Serial.print("DATA => ");
     if(gnss_valid){
         Serial.println("Posición válida!");
-        data = String(headers[0])+";"+overwritten_imei+";3FFFFF;95;1.0.21;1;"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";04BB4A02;334;20;3C1F;18;+"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+3+";"+1+";00000"+in2+in1+ign+";000000"+out2+out1+";"+mode+";1;0929;"+backup_batt+";"+power_in;
+        data = String(headers[0])+";"+overwritten_imei+";3FFFFF;95;1.0.21;1;"+fechaHora+";04BB4A02;334;20;3C1F;18;+"+String(latitude, 6)+";"+String(longitude, 6)+";"+speed+";"+course+";"+satellites+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+mode+";1;0929;"+backup_batt+";"+power_in;
     }else{
       Serial.println("SIN Posición válida!");
       getModemDateTime();
-      data = String(headers[0])+";"+overwritten_imei+";3FFFFF;95;1.0.21;1;"+datetimeModem+";04BB4A02;334;20;3C1F;18;+"+lat2+"0000;-"+lon2+"0000;"+String(speed2)+";81.36;"+vsat2+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+mode+";1;0929;"+backup_batt+";"+power_in;
+      data = String(headers[0])+";"+overwritten_imei+";3FFFFF;95;1.0.21;1;"+datetimeModem+";04BB4A02;334;20;3C1F;18;+"+lat2+"0000;-"+lon2+"0000;"+speed+";"+course+";"+satellites+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+mode+";1;0929;"+backup_batt+";"+power_in;
       //data  = "STT;6047417071;3FFFFF;95;1.0.21;1;20240923;08:39:16;04BB4A02;334;20;3C1F;18;+21.020603;-89.585097;0.19;81.36;17;1;00000001;00000000;1;1;0929;4.1;14.19";
     }
     Serial.println(data);
@@ -412,7 +410,7 @@ void sendDATA(String data){
 }
 bool output_active(String input){
   TinyGsmClient client(modem, 0);
-  String response = String(headers[2])+";"+overwritten_imei+";"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";000039C5;"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+vsat2+";"+fix+";2958851;"+power_in+";00000"+in2+in1+ign+";000000"+out2+out1+";0;0";
+  String response = String(headers[2])+";"+overwritten_imei+";"+fechaHora+";000039C5;"+String(latitude, 6)+";"+String(longitude, 6)+";"+speed+";"+course+";"+satellites+";"+fix+";2958851;"+power_in+";00000"+in2+in1+ign+";000000"+out2+out1+";0;0";
   String seco_on = String(headers[3])+";"+overwritten_imei+";"+"04;01";
   String seco_off = String(headers[3])+";"+overwritten_imei+";"+"04;02";
   Serial.print("SECO =: ");
@@ -444,13 +442,6 @@ bool output_active(String input){
   Serial.print("READ DATA: ");
   Serial.println(modem.waitResponse()); 
 }*/
-static void smartdelay(unsigned long ms){ //solo para gps 
-  unsigned long start = millis();
-  do {
-    while (serialgps.available())
-      gps.encode(serialgps.read());
-  } while (millis() - start < ms);
-}
 char* get_arrchar_value(float val, float invalid, int len, int prec) {
   static char buffer[32]; // Declara el buffer como estático para que no se destruya al salir de la función
 
@@ -472,9 +463,15 @@ char* get_arrchar_value(float val, float invalid, int len, int prec) {
   }
   return buffer; // Devuelve el buffer
 }
-
-static void print_float(float val, float invalid, int len, int prec) {
-  if (val == invalid){
+static void smartDelay(unsigned long ms) {
+  unsigned long start = millis();
+  do {
+    while (serialgps.available())
+      gps.encode(serialgps.read());
+  } while (millis() - start < ms);
+}
+static void printFloat(float val, bool valid, int len, int prec) {
+  if (!valid){
     while (len-- > 1)
       Serial.print('*');
     Serial.print(' ');
@@ -483,17 +480,15 @@ static void print_float(float val, float invalid, int len, int prec) {
     int vi = abs((int)val);
     int flen = prec + (val < 0.0 ? 2 : 1); // . and -
     flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
-    for (int i=flen; i<len; ++i){
+    for (int i=flen; i<len; ++i)
       Serial.print(' ');
-    }
   }
-  smartdelay(0);
+  smartDelay(0);
 }
-static void print_int(unsigned long val, unsigned long invalid, int len){
-  char sz[32];
-  if (val == invalid)
-    strcpy(sz, "*******");
-  else
+
+static void printInt(unsigned long val, bool valid, int len) {
+  char sz[32] = "*****************";
+  if (valid)
     sprintf(sz, "%ld", val);
   sz[len] = 0;
   for (int i=strlen(sz); i<len; ++i)
@@ -501,29 +496,33 @@ static void print_int(unsigned long val, unsigned long invalid, int len){
   if (len > 0) 
     sz[len-1] = ' ';
   Serial.print(sz);
-  smartdelay(0);
+  smartDelay(0);
 }
-static void print_date(TinyGPS &gps){
-  int year;
-  byte month, day, hour, minute, second, hundredths;
-  unsigned long age;
-  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
-  if (age == TinyGPS::GPS_INVALID_AGE){
-    //Serial.println("********** NO DATA GNSS ********** ");
-  }else {
-    sprintf(year2, "%04d", year);  // Convierte el entero a una cadena con formato de 4 dígitos
-    sprintf(month2, "%02d", month);
-    sprintf(day2, "%02d", day);  // Convierte el entero a una cadena con formato de 4 dígitos
-    sprintf(hour2, "%02d", hour);
-    sprintf(min2, "%02d", minute);
-    sprintf(sec2, "%02d", second);
-    
-    char sz[32];
-    //sprintf(sz, "%02d/%02d/%02d %02d:%02d:%02d ", month, day, year, hour, minute, second);
-   // Serial.println(sz);
+static void printDateTime(TinyGPSDate &d, TinyGPSTime &t) {
+  if (!d.isValid())
+  {
+    Serial.print(F("********** "));
   }
-  //print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
-  smartdelay(0);
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d%02d%02d;", d.month(), d.day(), d.year());
+    Serial.print(sz);
+  }
+  
+  if (!t.isValid())
+  {
+    Serial.print(F("******** "));
+  }
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d:%02d:%02d ", t.hour(), t.minute(), t.second());
+    Serial.print(sz);
+  }
+
+  printInt(d.age(), d.isValid(), 5);
+  smartDelay(0);
 }
 String getModemDateTime() {
   modem.sendAT("+CCLK?");
@@ -674,17 +673,23 @@ int mode_divice(){
     }
   return mode_dev;
 }
+String getDateTimeGPS(TinyGPSDate &d, TinyGPSTime &t) {
+  String fecha = String(d.year()) + (d.month() < 10 ? "0" : "") + String(d.month()) + (d.day() < 10 ? "0" : "") + String(d.day());
+  String hora = (t.hour() < 10 ? "0" : "") + String(t.hour()) + ":" + (t.minute() < 10 ? "0" : "") + String(t.minute()) + ":" + (t.second() < 10 ? "0" : "") + String(t.second());
+  return fecha + ";" + hora;
+}
+
 int event_generated(int event){
   //AGREGAR VALIDACION GNSS PARA MOSTRAR HORA DE SIM CUANDO NO HAY FIX
   String data_event = "";
   
   Serial.print("EVENT => ");
   if(gnss_valid){
-    data_event = String(headers[1])+";"+overwritten_imei+";3FFFFF;52;1.0.45;0;"+String(year2)+month2+day2+";"+hour2+":"+min2+":"+sec2+";0000B0E2;334;20;1223;11;+"+String(lat2, 6)+";"+String(lon2, 6)+";"+speed2+";81.36;"+vsat2+";"+1+";00000"+in2+in1+ign+";000000"+out2+out1+";"+event+";;";
+    data_event = String(headers[1])+";"+overwritten_imei+";3FFFFF;52;1.0.45;0;"+fechaHora+";0000B0E2;334;20;1223;11;+"+String(latitude, 6)+";"+String(longitude, 6)+";"+speed+";"+course+";"+satellites+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+event+";;";
     }else{
     float speed_err = (speed2 == -1.00) ? 0.00 : speed2;
       getModemDateTime();
-      data_event = String(headers[1])+";"+overwritten_imei+";3FFFFF;52;1.0.45;0;"+datetimeModem+";0000B0E2;334;20;1223;11;+"+String(lat2, 6)+";-"+String(lon2, 6)+";"+speed_err+";81.36;"+vsat2+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+event+";;";
+      data_event = String(headers[1])+";"+overwritten_imei+";3FFFFF;52;1.0.45;0;"+datetimeModem+";0000B0E2;334;20;1223;11;+"+String(lat2, 6)+";-"+String(lon2, 6)+";"+speed+";"+course+";"+satellites+";"+fix+";00000"+in2+in1+ign+";000000"+out2+out1+";"+event+";;";
     }
     Serial.println(data_event);
     sendDATA(data_event); //si la respuesta es exitosa retorna event!
