@@ -8,10 +8,8 @@
 static const int RXPin = 44, TXPin = 43;
 static const uint32_t GPSBaud = 9600;
 
-// The TinyGPS++ object
 TinyGPSPlus gps;
 
-// The serial connection to the GPS device
 SoftwareSerial serialgps(RXPin, TXPin);
 
 XPowersPMU  PMU;
