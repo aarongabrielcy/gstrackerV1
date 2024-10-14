@@ -1,20 +1,9 @@
-/*
-
-NOTA: Es necesario validar la posición(fix) todo el tiempo.
-1. si no tiene posición valida manda el ultimo lat y lon con fix.
-2. manda la hora de la sim cuando no haya posición valida
-3. al ya tener posición valida actualiza las variables lat y lon.
-4. crear una variable tipo buffer para guardar el ultimo trackeo mandado al servidor
-5. si no tiene fix manda las coordenas del ultimo buffer
-
-*/
 #include <Arduino.h>
 #define XPOWERS_CHIP_AXP2101
 #include "XPowersLib.h"
 #include "utilities.h"
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
-
 
 static const int RXPin = 44, TXPin = 43;
 static const uint32_t GPSBaud = 9600;
